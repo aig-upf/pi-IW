@@ -1,3 +1,5 @@
+import numpy as np
+
 def sample_cdf(cum_probs, size=None):
     s = cum_probs[-1]
     assert s > 0.99999 and s < 1.00001, "Probabilities do not sum to 1: %"%cum_probs #just to check our input looks like a probability distribution, not 100% sure though.
