@@ -136,26 +136,13 @@ class TreeActor:
     Interacts with an environment while adding nodes to a tree.
     """
 
-    def __init__(self, env, allow_restore, observe_fn=None):
+    def __init__(self, env, observe_fn=None):
         self.env = env
-        self.allow_restore = allow_restore
         self.tree = None
         self.observe_fn = observe_fn if observe_fn is not None else lambda x: x
 
-    def make_root(self, node, keep_subtree):
-        self.tree.new_root(node, keep_subtree)
-        if self.last_node is not self.tree.root:
-            self.last_node = None  # just in case, we'll restore before expanding
-
-    def reset_env(self):
-        obs = self.env.reset()
-        self.tree = Tree(self.env.action_space.n, {"obs": obs, "done": False})
-        self.observe(self.tree.root)
-        return self.tree
-
-    def step(self, node, action):
+    def generate_successor(self, node, action):
         if self.last_node is not node:
-            assert self.allow_restore
             self.env.unwrapped.restore_state(node.data["s"])
 
         # Perform step
@@ -163,11 +150,38 @@ class TreeActor:
         node_data = {"a": action, "r": r, "done": end_of_episode, "obs": next_obs}
         node_data.update(info) # add extra info e.g. atari lives
         child = self.tree.add(node, node_data)
-        self.observe(child)
+        self._observe(child)
         return child
 
-    def observe(self, node):
-        if self.allow_restore:
-            node.data["s"] = self.env.unwrapped.clone_state()
+    def step(self, a, cache_subtree):
+        next_node = self._get_next_node(self.tree, a)
+        root_data = self.tree.root.data
+
+        # "take a step" (actually remove other branches and make selected child root)
+        self.tree.new_root(next_node, keep_subtree=cache_subtree)
+        if self.last_node is not self.tree.root:
+            self.last_node = None  # just in case, we'll restore before expanding
+
+        return root_data, next_node.data
+
+    def reset(self):
+        obs = self.env.reset()
+        self.tree = Tree(self.env.action_space.n, {"obs": obs, "done": False})
+        self._observe(self.tree.root)
+        return self.tree
+
+    def _observe(self, node):
+        node.data["s"] = self.env.unwrapped.clone_state()
         self.observe_fn(self.env, node)
         self.last_node = node
+
+    def _get_next_node(self, tree, a):
+        assert not tree.root.is_leaf()
+
+        next_node = None
+        for child in tree.root.children:
+            if a == child.data["a"]:
+                next_node = child
+        assert next_node is not None, "Selected action not in tree. Something wrong with the lookahead policy?"
+
+        return next_node
