@@ -140,8 +140,11 @@ class TreeActor:
         self.env = env
         self.tree = None
         self.observe_fn = observe_fn if observe_fn is not None else lambda x: x
+        self.nodes_generated = 0
+        self._done = True
 
     def generate_successor(self, node, action):
+        assert not self._done, "Trying to generate nodes, but either the episode is over or hasn't started yet. Please use reset()."
         if self.last_node is not node:
             self.env.unwrapped.restore_state(node.data["s"])
 
@@ -151,23 +154,24 @@ class TreeActor:
         node_data.update(info) # add extra info e.g. atari lives
         child = self.tree.add(node, node_data)
         self._observe(child)
+        self.nodes_generated += 1
         return child
 
     def step(self, a, cache_subtree):
+        assert not self._done, "Trying to take a step, but either the episode is over or hasn't started yet. Please use reset()."
         next_node = self._get_next_node(self.tree, a)
         root_data = self.tree.root.data
 
         # "take a step" (actually remove other branches and make selected child root)
         self.tree.new_root(next_node, keep_subtree=cache_subtree)
-        if self.last_node is not self.tree.root:
-            self.last_node = None  # just in case, we'll restore before expanding
-
+        self._done = next_node.data["done"]
         return root_data, next_node.data
 
     def reset(self):
         obs = self.env.reset()
         self.tree = Tree(self.env.action_space.n, {"obs": obs, "done": False})
         self._observe(self.tree.root)
+        self._done = False
         return self.tree
 
     def _observe(self, node):

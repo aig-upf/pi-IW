@@ -22,24 +22,28 @@ class RolloutIW:
         self.ignore_terminal_nodes = ignore_terminal_nodes
         self.min_cum_prob = min_cum_prob # Prune when the cumulative probability of the remaining (not solved) actions is lower than this threshold
 
-    def plan(self, tree, successor_fn, stop_condition_fn=lambda:False):
+    def plan(self, tree, successor_fn, stop_condition_fn=lambda:False, policy_fn=None):
         """
         :param tree: Existing tree to begin expanding nodes. It can contain just the root node (for offline planning or
         online planning without caching nodes), or an existing tree with cached nodes.
         :param successor_fn: Function to generate a successor node (interacts with the simulator)
         :param stop_condition_fn: Evaluates to True when the planning should stop (e.g. nodes/time budget exhausted)
+        :param policy_fn: Given a node and the number of possible actions, it returns a policy (probability
+        distribution) that will be used for traversing the tree and for generating new nodes.
         :return:
         """
         self.novelty_table = RolloutNovelty1Table(self.ignore_cached_nodes)
+
+        if policy_fn is None: policy_fn = lambda n, bf: np.full(bf, 1 / bf) #  Uniform policy
 
         #Online planning only:
         self.initialize(tree) # To deal with an existing tree (maybe initialize novelty table with existing nodes, etc)
 
         while not stop_condition_fn() and not tree.root.solved:
             #Select
-            node, a = self.select(tree.root)
+            node, a = self.select(tree.root, policy_fn)
             if a is not None:
-                self.rollout(node, a, successor_fn, stop_condition_fn)
+                self.rollout(node, a, successor_fn, stop_condition_fn, policy_fn)
         
     def initialize(self, tree):
         """
@@ -73,7 +77,7 @@ class RolloutIW:
         p.fill(1/self.branching_factor)
         return p
     
-    def select(self, node):
+    def select(self, node, policy_fn):
         """
         Traverses the tree from node on and selects a node and an action that have not yet been expanded.
         :param node: Node where the tree traversing starts from.
@@ -88,7 +92,7 @@ class RolloutIW:
                 self.solve_and_propagate_label(node)
                 return None, None # Prune node
     
-            a, child = self.select_action_following_policy(node)
+            a, child = self.select_action_following_policy(node, policy_fn(node, self.branching_factor))
             assert child is None or (not child.solved and not child.data["done"]), "Solved: %s.  Done: %s.  Depth: %s"%(str(child.solved), str(child.data["done"]), str(child.depth))
 
             if a is None:
@@ -100,7 +104,7 @@ class RolloutIW:
                 else:
                     node = child # Continue traversing the tree
             
-    def select_action_following_policy(self, node):
+    def select_action_following_policy(self, node, policy):
         """
         Selects an action according to the policy given by _get_policy() (default is uniform distribution). It only
         takes into account nodes that have not been solved yet: it sets probabilities of already solved nodes to 0 and
@@ -112,7 +116,6 @@ class RolloutIW:
         :param node:
         :return: A tuple (action, successor), (action, None) or (None, None).
         """
-        policy = self._get_policy(node)
         if node.is_leaf():
             #return action to expand
             assert not node.solved and not node.data["done"], "Solved: %s.  Done: %s.  Depth: %s"%(str(node.solved), str(node.data["done"]), str(node.depth))
@@ -147,7 +150,7 @@ class RolloutIW:
 
         return a, child
     
-    def rollout(self, node, a, successor_fn, stop_condition_fn):
+    def rollout(self, node, a, successor_fn, stop_condition_fn, policy_fn):
         """
         Generates successor nodes in a depth first manner until the branch is pruned (or stop_condition_fn evaluates to
         True), starting from the given node-action pair.
@@ -173,7 +176,7 @@ class RolloutIW:
                     self.solve_and_propagate_label(node)
                     return
 
-            a, child = self.select_action_following_policy(node)
+            a, child = self.select_action_following_policy(node, policy_fn(node, self.branching_factor))
             assert a is not None and child is None, "Action: %s, child: %s"%(str(a), str(child))
         return
 

@@ -1,7 +1,7 @@
 # Define how we will extract features
 def gridenvs_BASIC_features(env, node):
     features_array = env.unwrapped.world.get_colors().flatten()
-    node.data["features"] = atoms = list(enumerate(features_array))
+    node.data["features"] = list(enumerate(features_array))
 
 if __name__ == "__main__":
     import gym
@@ -11,7 +11,6 @@ if __name__ == "__main__":
 
     env_id = "GE_PathKeyDoor-v0"
     max_tree_nodes = 30
-
 
     # Instead of env.step() and env.reset(), we'll use TreeActor helper class, which creates a tree and adds nodes to it
     env = gym.make(env_id)
