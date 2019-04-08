@@ -1,5 +1,10 @@
 import numpy as np
 from collections import defaultdict
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 class Node:
     def __init__(self, data, parent=None):
@@ -142,6 +147,14 @@ class TreeActor:
         self.observe_fn = observe_fn if observe_fn is not None else lambda x: x
         self.nodes_generated = 0
         self._done = True
+
+        # gym usually puts a TimeLimit wrapper around an env when creating it with gym.make(). We'll take this out since
+        # we'll most probably reach this limit (we will restore the internal state of the emulator but the step count
+        # of the wrapper will still increase
+        import gym.wrappers
+        if type(self.env) is gym.wrappers.TimeLimit:
+            self.env = self.env.env
+            logger.warn("TreeActor: ignoring TimeLimit wrapper.")
 
     def generate_successor(self, node, action):
         assert not self._done, "Trying to generate nodes, but either the episode is over or hasn't started yet. Please use reset()."

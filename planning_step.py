@@ -5,12 +5,20 @@ def gridenvs_BASIC_features(env, node):
 
 if __name__ == "__main__":
     import gym
+    import numpy as np
     from rollout_iw import RolloutIW
     from tree import TreeActor
     import gridenvs.examples # register GE environments to gym
 
-    env_id = "GE_PathKeyDoor-v0"
+
+    # HYPERPARAMETERS
+    seed = 0
+    env_id = "GE_MazeKeyDoor-v0"
     max_tree_nodes = 30
+
+
+    # Set random seed
+    np.random.seed(seed)
 
     # Instead of env.step() and env.reset(), we'll use TreeActor helper class, which creates a tree and adds nodes to it
     env = gym.make(env_id)

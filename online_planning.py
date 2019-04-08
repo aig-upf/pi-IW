@@ -1,3 +1,10 @@
+"""
+Example of online planning with Rollout IW using the set of BASIC features in the corridor example (the agent has to go
+pick the key, and undo the path to open a door). Note that this problem, with this set of features, has width 2, and is
+therefore not solvable in one (off-line) planning step.
+"""
+
+
 from utils import sample_pmf, softmax
 import numpy as np
 
@@ -23,17 +30,24 @@ if __name__ == "__main__":
     import gym
     from rollout_iw import RolloutIW
     from tree import TreeActor
-    from plan_step import gridenvs_BASIC_features
+    from planning_step import gridenvs_BASIC_features
     import gridenvs.examples #load simple envs
 
-    env_id = "GE_PathKeyDoor-v0"
+
+    # HYPERPARAMETERS
+    seed = 0
+    env_id = "GE_MazeKeyDoor-v0"
     max_tree_nodes = 30
     discount_factor = 0.99
     cache_subtree = True
 
+
+    # Set random seed
+    np.random.seed(seed)
+
     env = gym.make(env_id)
     actor = TreeActor(env, observe_fn=gridenvs_BASIC_features)
-    planner = RolloutIW(branching_factor=env.action_space.n)
+    planner = RolloutIW(branching_factor=env.action_space.n, ignore_cached_nodes=True)
 
     tree = actor.reset()
     episode_done = False
