@@ -66,6 +66,7 @@ def random_index(array_len, size=None, replace=False, probs=None, cumprobs=None)
 
 def softmax(x, temp=1, axis=-1):
     """Compute softmax values for each sets of scores in x."""
+    x = np.asarray(x)
     if temp == 0:
         res = (x == np.max(x, axis=-1))
         return res/np.sum(res, axis=-1)

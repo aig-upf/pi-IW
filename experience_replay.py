@@ -18,6 +18,16 @@ class ExperienceReplay:
         except AttributeError:
             raise ValueError("Trying to iterate over an empty dataset")
 
+
+    def add_column(self, name, examples):
+        try:
+            assert name not in self._data.keys()
+            assert len(self) == 0 or len(self) == len(examples)
+        except AttributeError:
+            self._data = {}
+        finally:
+            self._data[name] = deque(examples, maxlen=self.capacity)
+
     def append(self, example):
         try:
             for k, v in example.items():

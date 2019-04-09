@@ -103,15 +103,15 @@ class SupervisedPolicy(Learner):
 
 
 class SupervisedPolicyValue(Learner):
-    def __init__(self, model, optimizer, value_factor=1, regularization_factor=0.0001):
-        super(SupervisedPolicyValue, self).__init__(model, optimizer)
+    def __init__(self, model, optimizer, value_factor=1, regularization_factor=0.0001, use_graph=False):
+        super(SupervisedPolicyValue, self).__init__(model, optimizer, use_graph=use_graph)
         self.value_factor = value_factor
         self.regularization_factor = regularization_factor
 
     def loss(self, observations, target_policy, returns):
         logits, value = self.model(observations)
         cross_entropy = cross_entropy_loss(logits, target_policy, reduce_op=tf.reduce_mean)
-        value_loss = value_loss(value, returns, reduce_op=tf.reduce_mean)
+        vloss = value_loss(value, returns, reduce_op=tf.reduce_mean)
         regularization = l2_regularization(self.model.variables, reduce_op=tf.reduce_sum)  # TODO: use reduce mean here?
-        total_loss = cross_entropy + self.value_factor * value_loss + self.regularization_factor*regularization
-        return total_loss, [cross_entropy, value_loss, regularization]
+        total_loss = cross_entropy + self.value_factor * vloss + self.regularization_factor*regularization
+        return total_loss, [cross_entropy, vloss, regularization]

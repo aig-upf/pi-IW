@@ -5,7 +5,6 @@ from utils import sample_pmf
 class RolloutIW:
     def __init__(self, branching_factor, width=1, ignore_cached_nodes=False, ignore_terminal_nodes=False, min_cum_prob=0):
         """
-        Rollout IW as in Improving width-based planning with compact policies (Junyent et al. 2018)
         :param branching_factor: Number of possible actions
         :param width: Tuples of features of this length will be considered for novelty check
         :param ignore_cached_nodes: If set to True, nodes already existing in the tree will be ignored and their
@@ -70,12 +69,6 @@ class RolloutIW:
                     novelty = self.novelty_table.check_and_update(node.data["features"], node.depth, True)
                     if novelty > self.width:
                         self.solve_and_propagate_label(node)
-                    
-    def _get_policy(self, node):
-        #Uniform policy
-        p = np.empty((self.branching_factor,))
-        p.fill(1/self.branching_factor)
-        return p
     
     def select(self, node, policy_fn):
         """

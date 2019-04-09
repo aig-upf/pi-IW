@@ -5,8 +5,8 @@ therefore not solvable in one (off-line) planning step.
 """
 
 
-from utils import sample_pmf, softmax
 import numpy as np
+from utils import sample_pmf, softmax
 
 
 def compute_return(tree, discount_factor):
