@@ -1,0 +1,3 @@
+# Upgrade pip to its latest version
+tensorflow==1.12.0
+gym[atari]==0.11.0
