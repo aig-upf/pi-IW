@@ -13,8 +13,8 @@ if __name__ == "__main__":
 
     # HYPERPARAMETERS
     seed = 0
-    env_id = "GE_MazeKeyDoor-v0"
-    max_tree_nodes = 30
+    env_id = "GE_PathKeyDoor-v0"
+    max_tree_nodes = 20
 
 
     # Set random seed

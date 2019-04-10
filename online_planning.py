@@ -1,7 +1,7 @@
 """
-Example of online planning with Rollout IW using the set of BASIC features in the corridor example (the agent has to go
-pick the key, and undo the path to open a door). Note that this problem, with this set of features, has width 2, and is
-therefore not solvable in one (off-line) planning step.
+Example of online planning with Rollout IW (without any learning or guidance) using the set of BASIC features in the
+corridor example (the agent has to go pick the key, and undo the path to open a door). Note that this problem, with this
+set of features, has width 2, and is therefore not solvable in one (off-line) planning step.
 """
 
 
@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
     # HYPERPARAMETERS
     seed = 0
-    env_id = "GE_MazeKeyDoor-v0"
+    env_id = "GE_PathKeyDoor-v0"
     max_tree_nodes = 30
     discount_factor = 0.99
     cache_subtree = True
@@ -62,7 +62,8 @@ if __name__ == "__main__":
         prev_root_data, current_root_data = actor.step(a, cache_subtree=cache_subtree)
 
         episode_done = current_root_data["done"]
-        print("Action: %i. Reward: %.1f" % (current_root_data["a"], current_root_data["r"])) # obs is in prev_root_data
         steps_cnt += 1
+        print(actor.tree.root.data["s"][0], "Action: ", current_root_data["a"], "Reward: ", current_root_data["r"],
+              "Simulator steps:", actor.nodes_generated, "Planning steps:", steps_cnt, "\n")
 
-    print("It took %i steps" % steps_cnt)
+    print("It took %i steps but the problem can be solved in 13." % steps_cnt)
