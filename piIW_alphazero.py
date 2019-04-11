@@ -96,7 +96,7 @@ def get_pi_iw_planning_step_fn(actor, planner, policy_fn, tree_budget, discount_
 
 
 # Given either pi-IW or AlphaZero planning step functions, run an entire episode performing planning and learning steps
-def run_episode(plan_step_fn, learner, dataset, cache_subtree, add_returns, preproc_obs_fn=None):
+def run_episode(plan_step_fn, learner, dataset, cache_subtree, add_returns, preproc_obs_fn=None, render=False):
     episode_done = False
     actor.reset()
     episode_rewards = []
@@ -107,7 +107,7 @@ def run_episode(plan_step_fn, learner, dataset, cache_subtree, add_returns, prep
 
         # Execute action (choose one node as the new root from depth 1)
         a = sample_pmf(tree_policy)
-        prev_root_data, current_root_data = actor.step(a, cache_subtree=cache_subtree)
+        prev_root_data, current_root_data = actor.step(a, cache_subtree, render, render_size=(512,512))
         aux_replay.append({"observations": prev_root_data["obs"],
                            "target_policy": tree_policy})
         episode_rewards.append(current_root_data["r"])
@@ -164,6 +164,7 @@ if __name__ == "__main__":
     from experience_replay import ExperienceReplay
     from utils import remove_env_wrapper, env_has_wrapper
     from atari_wrappers import is_atari_env, wrap_atari_env
+    from distutils.util import strtobool
     import gridenvs.examples  # load simple envs
 
 
@@ -197,6 +198,7 @@ if __name__ == "__main__":
                         choices=["AlphaZero", "pi-IW-BASIC", "pi-IW-dynamic"])
     parser.add_argument("-s", "--seed", type=int, default=0)
     parser.add_argument("-e", "--env", type=str, default="GE_MazeKeyDoor-v2")
+    parser.add_argument("--render", type=strtobool, default="False")
     args, _ = parser.parse_known_args()
 
 
@@ -262,7 +264,8 @@ if __name__ == "__main__":
                                       dataset=experience_replay,
                                       cache_subtree=cache_subtree,
                                       add_returns=(args.algorithm=="AlphaZero"),
-                                      preproc_obs_fn=preproc_obs_fn)
+                                      preproc_obs_fn=preproc_obs_fn,
+                                      render=args.render)
         train_stats.report(episode_rewards, actor.nodes_generated)
 
     # Interleave planning and learning steps
@@ -273,5 +276,6 @@ if __name__ == "__main__":
                                       dataset=experience_replay,
                                       cache_subtree=cache_subtree,
                                       add_returns=(args.algorithm=="AlphaZero"),
-                                      preproc_obs_fn=preproc_obs_fn)
+                                      preproc_obs_fn=preproc_obs_fn,
+                                      render=args.render)
         train_stats.report(episode_rewards, actor.nodes_generated)

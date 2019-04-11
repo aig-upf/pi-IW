@@ -1,10 +1,6 @@
 from utils import env_has_wrapper
 import numpy as np
 from collections import defaultdict
-import logging
-
-
-logger = logging.getLogger(__name__)
 
 
 class Node:
@@ -169,7 +165,7 @@ class TreeActor:
         self.nodes_generated += 1
         return child
 
-    def step(self, a, cache_subtree):
+    def step(self, a, cache_subtree, render=False, render_size=None):
         assert not self._done, "Trying to take a step, but either the episode is over or hasn't started yet. Please use reset()."
         next_node = self._get_next_node(self.tree, a)
         root_data = self.tree.root.data
@@ -177,6 +173,8 @@ class TreeActor:
         # "take a step" (actually remove other branches and make selected child root)
         self.tree.new_root(next_node, keep_subtree=cache_subtree)
         self._done = next_node.data["done"]
+        self._obs = root_data["obs"]
+        if render: self.render(size=render_size)
         return root_data, next_node.data
 
     def reset(self):
@@ -201,3 +199,22 @@ class TreeActor:
         assert next_node is not None, "Selected action not in tree. Something wrong with the lookahead policy?"
 
         return next_node
+
+    def render(self, size=None):
+        import cv2
+        img = self._obs[-1] if type(self._obs) is list else self._obs
+        if size: img = cv2.resize(img, size, interpolation=cv2.INTER_NEAREST)
+        if len(img.shape) == 2: img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB) #img = np.expand_dims(img, -1)
+        try:
+            self.viewer.imshow(img)
+        except AttributeError:
+            from gym.envs.classic_control import rendering
+            self.viewer = rendering.SimpleImageViewer()
+            self.viewer.imshow(img)
+        return self.viewer.isopen
+
+    def __del__(self):
+        try:
+            self.viewer.close()
+        except AttributeError:
+            pass
