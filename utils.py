@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def sample_cdf(cum_probs, size=None):
     s = cum_probs[-1]
     assert s > 0.99999 and s < 1.00001, "Probabilities do not sum to 1: %"%cum_probs #just to check our input looks like a probability distribution, not 100% sure though.
@@ -73,3 +74,20 @@ def softmax(x, temp=1, axis=-1):
     x = x/temp
     e_x = np.exp( (x - np.max(x, axis=axis, keepdims=True)) ) #subtracting the max makes it more numerically stable, see http://cs231n.github.io/linear-classify/#softmax and https://stackoverflow.com/a/38250088/4121803
     return e_x / e_x.sum(axis=axis, keepdims=True)
+
+
+def env_has_wrapper(env, wrapper_type):
+    while env is not env.unwrapped:
+        if isinstance(env, wrapper_type):
+            return True
+        env = env.env
+    return False
+
+
+def remove_env_wrapper(env, wrapper_type):
+    if env is not env.unwrapped:
+        if isinstance(env, wrapper_type):
+            env = remove_env_wrapper(env.env, wrapper_type)
+        else:
+            env.env = remove_env_wrapper(env.env, wrapper_type)
+    return env

@@ -11,21 +11,24 @@ from planning_step import gridenvs_BASIC_features
 
 
 # "observe" function will be executed at each interaction with the environment
-def get_observe_funcion(algorithm, model):
+def get_observe_funcion(algorithm, model, preproc_obs_fn=None):
+    if preproc_obs_fn is None:
+        preproc_obs_fn = lambda x: np.asarray(x)  #
+
     def observe_alphazero(env, node):
-        x = tf.constant(np.expand_dims(node.data["obs"], axis=0).astype(np.float32))
+        x = tf.constant(preproc_obs_fn([node.data["obs"]]).astype(np.float32)) #TODO: maybe change dtype to tf.constant and take out np.asarray from preproc_obs_fn
         logits, value = model(x, output_features=False)
         node.data["probs"] = tf.nn.softmax(logits).numpy().ravel()
         node.data["v"] = value.numpy().squeeze()
 
     def observe_pi_iw_BASIC(env, node):
-        x = tf.constant(np.expand_dims(node.data["obs"], axis=0).astype(np.float32))
+        x = tf.constant(preproc_obs_fn([node.data["obs"]]).astype(np.float32))
         logits = model(x)
         node.data["probs"] = tf.nn.softmax(logits).numpy().ravel()
         gridenvs_BASIC_features(env, node)  # compute BASIC features for gridenvs
 
     def observe_pi_iw_dynamic(env, node):
-        x = tf.constant(np.expand_dims(node.data["obs"], axis=0).astype(np.float32))
+        x = tf.constant(preproc_obs_fn([node.data["obs"]]).astype(np.float32))
         logits, features = model(x, output_features=True)
         node.data["probs"] = tf.nn.softmax(logits).numpy().ravel()
         node.data["features"] = features.numpy().ravel()
@@ -93,22 +96,28 @@ def get_pi_iw_planning_step_fn(actor, planner, policy_fn, tree_budget, discount_
 
 
 # Given either pi-IW or AlphaZero planning step functions, run an entire episode performing planning and learning steps
-def run_episode(plan_step_fn, learner, dataset, cache_subtree, add_returns):
+def run_episode(plan_step_fn, learner, dataset, cache_subtree, add_returns, preproc_obs_fn=None):
     episode_done = False
     actor.reset()
     episode_rewards = []
     aux_replay = ExperienceReplay()  # New auxiliary buffer to save current episode transitions
     while not episode_done:
+        # Planning step
         tree_policy = plan_step_fn(len(episode_rewards))
+
+        # Execute action (choose one node as the new root from depth 1)
         a = sample_pmf(tree_policy)
         prev_root_data, current_root_data = actor.step(a, cache_subtree=cache_subtree)
         aux_replay.append({"observations": prev_root_data["obs"],
-                        "target_policy": tree_policy})
+                           "target_policy": tree_policy})
         episode_rewards.append(current_root_data["r"])
         episode_done = current_root_data["done"]
 
+        # Learning step
         if learner is not None:
             batch = dataset.sample(batch_size)
+            if preproc_obs_fn is not None:
+                batch["observations"] = preproc_obs_fn(batch["observations"])
             obs = tf.constant(batch["observations"], dtype=tf.float32)
             target_policy = tf.constant(batch["target_policy"], dtype=tf.float32)
             if add_returns:
@@ -117,6 +126,7 @@ def run_episode(plan_step_fn, learner, dataset, cache_subtree, add_returns):
             else:
                 loss, _ = learner.train_step(obs, target_policy)
 
+    # Add episode to the dataset
     if add_returns:
         returns = compute_returns(episode_rewards, discount_factor)  # Backpropagate rewards
         aux_replay.add_column("returns", returns)  # Add them to the dataset
@@ -144,30 +154,21 @@ class TrainStats:
 
 
 if __name__ == "__main__":
-    import gym
+    import gym, gym.wrappers
     import argparse
+    import logging
     from mcts import MCTSAlphaZero
     from rollout_iw import RolloutIW
     from tree import TreeActor
     from supervised_policy import Mnih2013, SupervisedPolicy, SupervisedPolicyValue
     from experience_replay import ExperienceReplay
+    from utils import remove_env_wrapper, env_has_wrapper
+    from atari_wrappers import is_atari_env, wrap_atari_env
     import gridenvs.examples  # load simple envs
 
 
-    # Compatibility with tensorflow 2.0
-    tf.enable_eager_execution()
-    tf.enable_resource_variables()
-
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-a", "--algorithm", type=str, default="pi-IW-dynamic",
-                        choices=["AlphaZero", "pi-IW-BASIC", "pi-IW-dynamic"])
-    parser.add_argument("-s", "--seed", type=int, default=0)
-    parser.add_argument("-e", "--env", type=str, default="GE_MazeKeyDoor-v2")
-    args, _ = parser.parse_known_args()
-
     # HYPERPARAMETERS
-    tree_budget = 20
+    tree_budget = 50
     discount_factor = 0.99
     puct_factor = 0.5 # AlphaZero
     first_moves_temp = np.inf # AlphaZero
@@ -182,19 +183,52 @@ if __name__ == "__main__":
     clip_grad_norm = 40
     rmsprop_decay = 0.99
     rmsprop_epsilon = 0.1
+    frameskip_atari = 15
+
+
+    logger = logging.getLogger(__name__)
+
+    # Compatibility with tensorflow 2.0
+    tf.enable_eager_execution()
+    tf.enable_resource_variables()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-a", "--algorithm", type=str, default="pi-IW-dynamic",
+                        choices=["AlphaZero", "pi-IW-BASIC", "pi-IW-dynamic"])
+    parser.add_argument("-s", "--seed", type=int, default=0)
+    parser.add_argument("-e", "--env", type=str, default="GE_MazeKeyDoor-v2")
+    args, _ = parser.parse_known_args()
 
 
     # Set random seed
     np.random.seed(args.seed)
     tf.set_random_seed(args.seed)
 
-    # Define environment, model and optimizer and tree actor
+    # Create the gym environment. When creating it with gym.make(), gym usually puts a TimeLimit wrapper around an env.
+    # We'll take this out since we will most likely reach the step limit (when restoring the internal state of the
+    # emulator the step count of the wrapper will not reset)
     env = gym.make(args.env)
+    if env_has_wrapper(env, gym.wrappers.TimeLimit):
+        env = remove_env_wrapper(env, gym.wrappers.TimeLimit)
+        logger.warning("TimeLimit environment wrapper removed.")
+
+    # If the environment is an Atari game, the observations will be the last four frames stacked in a 4-channel image
+    if is_atari_env(env):
+        env = wrap_atari_env(env, frameskip_atari)
+        logger.warning("Atari environment modified: observation is now a 4-channel image of the last four non-skipped frames in grayscale. Frameskip set to %i." % frameskip_atari)
+        preproc_obs_fn = lambda obs_batch: np.moveaxis(obs_batch, 1, -1)  # move channels to the last dimension
+    else:
+        preproc_obs_fn = None
+
+    # Define model and optimizer
     model = Mnih2013(num_logits=env.action_space.n, add_value=(args.algorithm=="AlphaZero"))
     optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate,
                                           decay=rmsprop_decay,
                                           epsilon=rmsprop_epsilon)
-    actor = TreeActor(env, observe_fn=get_observe_funcion(args.algorithm, model))
+
+    # TreeActor provides equivalent functions to env.step() and env.reset() for on-line planning: it creates a tree,
+    # adds nodes to it and allows us to take steps (maybe keeping the subtree)
+    actor = TreeActor(env, observe_fn=get_observe_funcion(args.algorithm, model, preproc_obs_fn))
 
     # Define, depending on the algorithm, the planner and the step functions for planning and learning
     if args.algorithm == "AlphaZero":
@@ -210,7 +244,7 @@ if __name__ == "__main__":
     else:
         assert args.algorithm in ("pi-IW-BASIC", "pi-IW-dynamic")
         planner = RolloutIW(branching_factor=env.action_space.n, ignore_cached_nodes=True)
-        network_policy = lambda node, bf: node.data["probs"]
+        network_policy = lambda node, bf: node.data["probs"]  # Policy to guide the planner: NN output probabilities
         plan_step_fn = get_pi_iw_planning_step_fn(actor=actor,
                                                   planner=planner,
                                                   policy_fn=network_policy,
@@ -227,7 +261,8 @@ if __name__ == "__main__":
                                       learner=None,
                                       dataset=experience_replay,
                                       cache_subtree=cache_subtree,
-                                      add_returns=(args.algorithm=="AlphaZero"))
+                                      add_returns=(args.algorithm=="AlphaZero"),
+                                      preproc_obs_fn=preproc_obs_fn)
         train_stats.report(episode_rewards, actor.nodes_generated)
 
     # Interleave planning and learning steps
@@ -237,5 +272,6 @@ if __name__ == "__main__":
                                       learner=learner,
                                       dataset=experience_replay,
                                       cache_subtree=cache_subtree,
-                                      add_returns=(args.algorithm=="AlphaZero"))
+                                      add_returns=(args.algorithm=="AlphaZero"),
+                                      preproc_obs_fn=preproc_obs_fn)
         train_stats.report(episode_rewards, actor.nodes_generated)

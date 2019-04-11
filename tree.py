@@ -1,3 +1,4 @@
+from utils import env_has_wrapper
 import numpy as np
 from collections import defaultdict
 import logging
@@ -148,13 +149,11 @@ class TreeActor:
         self.nodes_generated = 0
         self._done = True
 
-        # gym usually puts a TimeLimit wrapper around an env when creating it with gym.make(). We'll take this out since
-        # we'll most probably reach this limit (we will restore the internal state of the emulator but the step count
-        # of the wrapper will still increase
+        # gym usually puts a TimeLimit wrapper around an env when creating it with gym.make(). In our case this is not
+        # desired since we will most probably reach the step limit (the step count will not reset when restoring the
+        # internal state).
         import gym.wrappers
-        if type(self.env) is gym.wrappers.TimeLimit:
-            self.env = self.env.env
-            logger.warn("TreeActor: ignoring TimeLimit wrapper.")
+        assert not env_has_wrapper(self.env, gym.wrappers.TimeLimit)
 
     def generate_successor(self, node, action):
         assert not self._done, "Trying to generate nodes, but either the episode is over or hasn't started yet. Please use reset()."
