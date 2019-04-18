@@ -1,6 +1,6 @@
 # Define how we will extract features
 def gridenvs_BASIC_features(env, node):
-    features_array = env.unwrapped.world.get_colors().flatten()
+    features_array = env.unwrapped.state["world"].get_colors().flatten()
     node.data["features"] = list(enumerate(features_array))
 
 if __name__ == "__main__":
