@@ -55,7 +55,7 @@ def compute_returns(rewards, discount_factor):
     for i in range(len(rewards) - 1, -1, -1):
         R = rewards[i] + discount_factor * R
         returns.append(R)
-    return returns
+    return list(reversed(returns))
 
 
 class Counter:
