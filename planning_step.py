@@ -1,7 +1,9 @@
+def features_to_atoms(feature_vector):
+    return list(enumerate(feature_vector))
+
 # Define how we will extract features
 def gridenvs_BASIC_features(env, node):
-    features_array = env.unwrapped.state["world"].get_colors().flatten()
-    node.data["features"] = list(enumerate(features_array))
+    node.data["features"] = features_to_atoms(env.unwrapped.state["world"].get_colors().flatten())
 
 if __name__ == "__main__":
     import gym

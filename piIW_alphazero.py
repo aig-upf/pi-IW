@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from utils import softmax, sample_pmf
 from online_planning import softmax_Q_tree_policy
-from planning_step import gridenvs_BASIC_features
+from planning_step import gridenvs_BASIC_features, features_to_atoms
 
 
 # "observe" function will be executed at each interaction with the environment
@@ -31,7 +31,7 @@ def get_observe_funcion(algorithm, model, preproc_obs_fn=None):
         x = tf.constant(preproc_obs_fn([node.data["obs"]]).astype(np.float32))
         logits, features = model(x, output_features=True)
         node.data["probs"] = tf.nn.softmax(logits).numpy().ravel()
-        node.data["features"] = features.numpy().ravel()
+        node.data["features"] = features_to_atoms(features.numpy().ravel().astype(np.bool))  # discretization -> bool
 
     if algorithm == "AlphaZero": return observe_alphazero
     elif algorithm == "pi-IW-BASIC": return observe_pi_iw_BASIC

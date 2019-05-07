@@ -4,7 +4,7 @@ Example of pi-IW: guided Rollout-IW, interleaving planning and learning.
 
 import numpy as np
 import tensorflow as tf
-from planning_step import gridenvs_BASIC_features
+from planning_step import gridenvs_BASIC_features, features_to_atoms
 from online_planning import softmax_Q_tree_policy
 
 
@@ -13,7 +13,7 @@ def observe_pi_iw_dynamic(env, node):
     x = tf.constant(np.expand_dims(node.data["obs"], axis=0).astype(np.float32))
     logits, features = model(x, output_features=True)
     node.data["probs"] = tf.nn.softmax(logits).numpy().ravel()
-    node.data["features"] = features.numpy().ravel()
+    node.data["features"] = features_to_atoms(features.numpy().ravel().astype(np.bool)) # discretization -> bool
 
 
 def observe_pi_iw_BASIC(env, node):
