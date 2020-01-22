@@ -189,10 +189,6 @@ if __name__ == "__main__":
 
     logger = logging.getLogger(__name__)
 
-    # Compatibility with tensorflow 2.0
-    tf.enable_eager_execution()
-    tf.enable_resource_variables()
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-a", "--algorithm", type=str, default="pi-IW-dynamic",
                         choices=["AlphaZero", "pi-IW-BASIC", "pi-IW-dynamic"])
@@ -204,7 +200,7 @@ if __name__ == "__main__":
 
     # Set random seed
     np.random.seed(args.seed)
-    tf.set_random_seed(args.seed)
+    tf.random.set_seed(args.seed)
 
     # Create the gym environment. When creating it with gym.make(), gym usually puts a TimeLimit wrapper around an env.
     # We'll take this out since we will most likely reach the step limit (when restoring the internal state of the
@@ -224,9 +220,9 @@ if __name__ == "__main__":
 
     # Define model and optimizer
     model = Mnih2013(num_logits=env.action_space.n, add_value=(args.algorithm=="AlphaZero"))
-    optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate,
-                                          decay=rmsprop_decay,
-                                          epsilon=rmsprop_epsilon)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate,
+                                            rho=rmsprop_decay,
+                                            epsilon=rmsprop_epsilon)
 
     # TreeActor provides equivalent functions to env.step() and env.reset() for on-line planning: it creates a tree,
     # adds nodes to it and allows us to take steps (maybe keeping the subtree)

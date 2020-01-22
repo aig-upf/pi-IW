@@ -48,11 +48,6 @@ if __name__ == "__main__":
     import gridenvs.examples  # load simple envs
 
 
-    # Compatibility with tensorflow 2.0
-    tf.enable_eager_execution()
-    tf.enable_resource_variables()
-
-
     # HYPERPARAMETERS
     seed = 0
     env_id = "GE_PathKeyDoor-v0"
@@ -72,7 +67,7 @@ if __name__ == "__main__":
 
     # Set random seed
     np.random.seed(seed)
-    tf.set_random_seed(seed)
+    tf.random.set_seed(seed)
 
     # Instead of env.step() and env.reset(), we'll use TreeActor helper class, which creates a tree and adds nodes to it
     env = gym.make(env_id)
@@ -81,9 +76,10 @@ if __name__ == "__main__":
     planner = RolloutIW(branching_factor=env.action_space.n, ignore_cached_nodes=True)
 
     model = Mnih2013(num_logits=env.action_space.n, add_value=False)
-    optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate,
-                                          decay=rmsprop_decay,
-                                          epsilon=rmsprop_epsilon)
+
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate,
+                                            rho=rmsprop_decay,
+                                            epsilon=rmsprop_epsilon)
     learner = SupervisedPolicy(model, optimizer, regularization_factor=regularization_factor, use_graph=True)
     experience_replay = ExperienceReplay(capacity=replay_capacity)
 

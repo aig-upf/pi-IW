@@ -54,7 +54,7 @@ class Learner:
         self.optimizer = optimizer
         self.grad_proc_fn = grad_proc_fn
         if use_graph:
-            self.train_step = tf.contrib.eager.defun(self.train_step) # TODO: Update to tf.function by setting autograph to False
+            self.train_step = tf.function(self.train_step, autograph=False)
 
     def train(self, get_batch_fn, steps):
         for _ in range(steps):
@@ -80,7 +80,7 @@ def value_loss(values, returns, reduce_op=tf.reduce_mean):
 
 
 def cross_entropy_loss(logits, target_policy, reduce_op=tf.reduce_mean):
-    xent = tf.nn.softmax_cross_entropy_with_logits_v2(labels=target_policy, logits=logits)
+    xent = tf.nn.softmax_cross_entropy_with_logits(labels=target_policy, logits=logits)
     return reduce_op(xent, axis=0)
 
 
