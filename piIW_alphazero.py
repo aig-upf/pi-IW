@@ -134,7 +134,6 @@ def run_episode(plan_step_fn, learner, dataset, cache_subtree, add_returns, prep
 
     return episode_rewards
 
-
 class TrainStats:
     def __init__(self):
         self.last_interactions = 0
@@ -185,7 +184,6 @@ if __name__ == "__main__":
     rmsprop_decay = 0.99
     rmsprop_epsilon = 0.1
     frameskip_atari = 15
-
 
     logger = logging.getLogger(__name__)
 

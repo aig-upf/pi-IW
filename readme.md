@@ -26,3 +26,8 @@ Important: this repository is a reimplementation of the algorithm in Tensorflow 
 ## Installation
 * Install the requirements (numpy, tensorflow and gym packages)
 * Make sure that [gridenvs](https://github.com/aig-upf/gridenvs) is added to the python path.
+
+
+
+##### Update (31/07/2020)
+We corrected a bug that altered the input of the neural network for atari games. This affects the results of Table 2 of the paper.

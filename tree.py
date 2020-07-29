@@ -154,7 +154,7 @@ class TreeActor:
     def generate_successor(self, node, action):
         assert not self._done, "Trying to generate nodes, but either the episode is over or hasn't started yet. Please use reset()."
         if self.last_node is not node:
-            self.env.unwrapped.restore_state(node.data["s"])
+            self.env.restore_state(node.data["s"])
 
         # Perform step
         next_obs, r, end_of_episode, info = self.env.step(action)
@@ -185,7 +185,7 @@ class TreeActor:
         return self.tree
 
     def _observe(self, node):
-        node.data["s"] = self.env.unwrapped.clone_state()
+        node.data["s"] = self.env.clone_state()
         self.observe_fn(self.env, node)
         self.last_node = node
 

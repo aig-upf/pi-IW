@@ -63,7 +63,8 @@ if __name__ == "__main__":
 
         episode_done = current_root_data["done"]
         steps_cnt += 1
-        print(actor.tree.root.data["s"]["world"], "Action: ", current_root_data["a"], "Reward: ", current_root_data["r"],
+        print("\n".join([" ".join(row) for row in env.unwrapped.get_char_matrix(actor.tree.root.data["s"])]),
+              "Action: ", current_root_data["a"], "Reward: ", current_root_data["r"],
               "Simulator steps:", actor.nodes_generated, "Planning steps:", steps_cnt, "\n")
 
     print("It took %i steps but the problem can be solved in 13." % steps_cnt)
