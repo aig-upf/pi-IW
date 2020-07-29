@@ -121,7 +121,8 @@ if __name__ == "__main__":
 
         steps_cnt += 1
         episode_steps +=1
-        print(actor.tree.root.data["s"]["world"], "Reward: ", r, "Simulator steps:", actor.nodes_generated,
+        print("\n".join([" ".join(row) for row in env.unwrapped.get_char_matrix(actor.tree.root.data["s"])]),
+              "Reward: ", r, "Simulator steps:", actor.nodes_generated,
               "Planning steps:", steps_cnt, "Loss:", loss.numpy(), "\n")
         if episode_done:
             print("Problem solved in %i steps (min 13 steps)."%episode_steps)

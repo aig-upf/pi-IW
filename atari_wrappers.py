@@ -2,17 +2,31 @@ import gym
 import cv2
 from collections import deque
 
-class ResizeImage(gym.ObservationWrapper):
+# Gym wrapper with clone/restore state
+class Wrapper(gym.Wrapper):
+    def clone_state(self):
+        return self.env.clone_state()
+
+    def restore_state(self, state):
+        self.env.restore_state(state)
+
+
+class ResizeImage(Wrapper):
     def __init__(self, env, new_size):
         super(ResizeImage, self).__init__(env)
         self.resize_fn = lambda obs: cv2.resize(obs, dsize=new_size, interpolation=cv2.INTER_LINEAR)
         self.observation_space = gym.spaces.Box(low=0, high=255, shape=new_size)
 
-    def observation(self, observation):
+    def reset(self, **kwargs):
+        observation = self.env.reset(**kwargs)
         return self.resize_fn(observation)
 
+    def step(self, action):
+        observation, reward, done, info = self.env.step(action)
+        return self.resize_fn(observation), reward, done, info
 
-class FrameBuffer(gym.Wrapper):
+
+class FrameBuffer(Wrapper):
     def __init__(self, env, buffer_size):
         assert (buffer_size > 0)
         super(FrameBuffer, self).__init__(env)
@@ -36,6 +50,13 @@ class FrameBuffer(gym.Wrapper):
         # Return a list instead of a numpy array to reduce space in memory when storing the same frame more than once
         return list(self.observations)
 
+    def clone_state(self):
+        return (tuple(self.observations), self.env.clone_state())
+
+    def restore_state(self, state):
+        assert len(state[0]) == len(self.observations)
+        self.observations.extend(state[0])
+        return self.env.restore_state(state[1])
 
 def is_atari_env(env):
     import gym.envs.atari

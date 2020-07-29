@@ -83,7 +83,7 @@ def get_alphazero_planning_step_fn(actor, planner, tree_budget, first_moves_temp
 
 
 # pi-IW planning step function with given hyperparameters
-def get_pi_iw_planning_step_fn(actor, planner, policy_fn, tree_budget, discount_factor):
+def get_pi_iw_planning_step_fn(actor, planner, policy_fn, tree_budget, discount_factor, temp):
     def pi_iw_planning_step(episode_tranistions):
         nodes_before_planning = len(actor.tree)
         budget_fn = lambda: len(actor.tree) - nodes_before_planning == tree_budget
@@ -91,7 +91,7 @@ def get_pi_iw_planning_step_fn(actor, planner, policy_fn, tree_budget, discount_
                      successor_fn=actor.generate_successor,
                      stop_condition_fn=budget_fn,
                      policy_fn=policy_fn)
-        return softmax_Q_tree_policy(actor.tree, actor.tree.branching_factor, discount_factor, temp=0)
+        return softmax_Q_tree_policy(actor.tree, actor.tree.branching_factor, discount_factor, temp=temp)
     return pi_iw_planning_step
 
 
@@ -134,7 +134,6 @@ def run_episode(plan_step_fn, learner, dataset, cache_subtree, add_returns, prep
 
     return episode_rewards
 
-
 class TrainStats:
     def __init__(self):
         self.last_interactions = 0
@@ -173,7 +172,7 @@ if __name__ == "__main__":
     discount_factor = 0.99
     puct_factor = 0.5 # AlphaZero
     first_moves_temp = np.inf # AlphaZero
-    policy_temp = 1 # AlphaZero
+    policy_temp = 1 # pi-IW and AlphaZero
     cache_subtree = True
     batch_size = 32
     learning_rate = 0.0007
@@ -185,7 +184,6 @@ if __name__ == "__main__":
     rmsprop_decay = 0.99
     rmsprop_epsilon = 0.1
     frameskip_atari = 15
-
 
     logger = logging.getLogger(__name__)
 
@@ -247,7 +245,8 @@ if __name__ == "__main__":
                                                   planner=planner,
                                                   policy_fn=network_policy,
                                                   tree_budget=tree_budget,
-                                                  discount_factor=discount_factor)
+                                                  discount_factor=discount_factor,
+                                                  temp=policy_temp)
         learner = SupervisedPolicy(model, optimizer, regularization_factor=regularization_factor, use_graph=True)
 
     # Initialize experience replay: run complete episodes until we exceed both batch_size and dataset_min_transitions
