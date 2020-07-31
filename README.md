@@ -17,3 +17,7 @@ Atari games that end with 'Wrapped-v0' stack 4 consecutive grayscale images into
 All experiments of the paper were done using the single process version above.
 
 For distributed training, we need to run many instances of launch_task.py. We provide a helper script to automatically run many processes in the same machine. Learning is distributed in many workers that compute stale gradients from their copy of the network parameters. They can perform a gradient descent step updating the global (shared) parameters in a synchronous or asyncrhonous manner.
+
+
+##### Update (31/07/2020)
+We corrected a bug that altered the input of the neural network for atari games. This affects the results of Table 2 of the paper.

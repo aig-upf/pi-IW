@@ -95,17 +95,17 @@ class MyAtariEnv(AtariEnv):
     def _get_gray(self):
         return self.ale.getScreenGrayscale().reshape((self.screen_height, self.screen_width))
 
-    def _reset(self):
+    def reset(self):
         self.current_steps = 0
-        obs = AtariEnv._reset(self)
+        obs = AtariEnv.reset(self)
         if self.max_noops > 0:
             for _ in range(np.random.randint(1, self.max_noops+1)):
                 obs, _, done, _ = self.step(0)
                 assert not done, "Episode ended while taking noops in reset()"
         return obs
 
-    def _step(self, action):
-        obs, r, done, info = AtariEnv._step(self, action)
+    def step(self, action):
+        obs, r, done, info = AtariEnv.step(self, action)
         try:
             self.current_steps += self.frameskip
         except TypeError:
@@ -135,12 +135,12 @@ class AtariPlanningEnv(gym.Wrapper):
     way of refreshing the ALE screen buffer.
     See https://github.com/mgbellemare/Arcade-Learning-Environment/issues/165
     """
-    def _step(self, action):
+    def step(self, action):
         self.last_state = self.unwrapped.clone_full_state()
         self.last_action = action
         return self.env.step(action)
         
-    def _reset(self):
+    def reset(self):
         obs = self.env.reset()
         obs, r, done, info = self.step(0) #noop
         assert not done, "End of episode at reset()."
@@ -158,15 +158,28 @@ class AtariPlanningEnv(gym.Wrapper):
         return self.unwrapped._get_obs()
 
 
-class MaxFilter(gym.ObservationWrapper):
+# Gym wrapper with clone/restore state
+class Wrapper(gym.Wrapper):
+    def clone_state(self):
+        return self.env.clone_state()
+
+    def restore_state(self, state):
+        self.env.restore_state(state)
+
+
+class MaxFilter(Wrapper):
     """
     Observation is elementwise maximum between last two observations
     """
     def __init__(self, env):
         super(MaxFilter, self).__init__(env)
         self.observations = deque(maxlen=2)
-        
-    def _reset(self):
+
+    def step(self, action):
+        obs, r, done, info = self.env.step(action)
+        return self._observation(obs), r, done, info
+
+    def reset(self):
         observation = self.env.reset()
         self.observations.append(observation)
         self.observations.append(observation)
@@ -177,13 +190,13 @@ class MaxFilter(gym.ObservationWrapper):
         return np.max(self.observations, axis=0)
 
 
-class MaxFilterFrameskip(gym.Wrapper):
+class MaxFilterFrameskip(Wrapper):
     def __init__(self, env, frameskip=4):
         super(MaxFilterFrameskip, self).__init__(env)
         self.observations = deque(maxlen=2)
         self.frameskip = frameskip
         
-    def _step(self, action):
+    def step(self, action):
         reward = 0.0
         for _ in range(self.frameskip):
             obs, r, done, info = self.env.step(action)
@@ -193,14 +206,14 @@ class MaxFilterFrameskip(gym.Wrapper):
                 break
         return np.max(self.observations, axis=0), reward, done, info
     
-    def _reset(self):
+    def reset(self):
         observation = self.env.reset()
         self.observations.append(observation)
         self.observations.append(observation)
         return observation
 
 
-class ResizeImage(gym.ObservationWrapper):
+class ResizeImage(Wrapper):
     """
     Resizes frame to new_size
     """
@@ -208,12 +221,17 @@ class ResizeImage(gym.ObservationWrapper):
         super(ResizeImage, self).__init__(env)
         self.resize_fn = lambda obs: cv2.resize(obs, dsize=new_size, interpolation = cv2.INTER_LINEAR)
         self.observation_space = gym.spaces.Box(low=0, high=255, shape=new_size)
-        
-    def _observation(self, observation):
+
+    def reset(self):
+        observation = self.env.reset()
         return self.resize_fn(observation)
 
+    def step(self, action):
+        observation, reward, done, info = self.env.step(action)
+        return self.resize_fn(observation), reward, done, info
 
-class Grayscale(gym.ObservationWrapper):
+
+class Grayscale(Wrapper):
     """
     Ignores observation from previous wrapper/environment and returns ale.getScreenGrayscale().
     """
@@ -222,11 +240,19 @@ class Grayscale(gym.ObservationWrapper):
         self.screen_width, self.screen_height = self.unwrapped.ale.getScreenDims()
         self.observation_space = gym.spaces.Box(low=0, high=255, shape=self.observation_space.shape[:-1])
 
-    def _observation(self, observation):
+    def reset(self):
+        _ = self.env.reset()
+        return self._observation()
+
+    def step(self, action):
+        _, reward, done, info = self.env.step(action)
+        return self._observation(), reward, done, info
+
+    def _observation(self):
         return self.unwrapped.ale.getScreenGrayscale().reshape((self.screen_height, self.screen_width)) #faster than converting the input RGB observation
 
 
-class OneLifeEpisode(gym.Wrapper):
+class OneLifeEpisode(Wrapper):
     """
     Emits terminal signal when loosing a life, causing the agent to reset the
     environment. This reset is 'fake' though, so that the whole state space can
@@ -237,14 +263,14 @@ class OneLifeEpisode(gym.Wrapper):
         self.lives = self.env.unwrapped.ale.lives()
         self.done = True
     
-    def _step(self, action):
+    def step(self, action):
         observation, reward, self.done, info = self.env.step(action)
         lives = self.env.unwrapped.ale.lives()
         done = True if lives < self.lives else self.done
         self.lives = lives
         return observation, reward, done, info
     
-    def _reset(self):
+    def reset(self):
         if not self.done:
             observation, _, done, _ = self.env.step(0) #perform 1 noop step
             if not done:
@@ -267,12 +293,12 @@ class StackFrames(gym.Wrapper):
             shape = list(self.observation_space.shape) + [self.buffer_size]
         self.observation_space = gym.spaces.Box(low=0, high=255, shape=shape)
         
-    def _step(self, a):
+    def step(self, a):
         observation, reward, done, info = self.env.step(a)
         self.observations.append(observation)
         return self._observation(), reward, done, info
     
-    def _reset(self):
+    def reset(self):
         initial_frame = self.env.reset()
         for _ in range(self.buffer_size):
             self.observations.append(initial_frame)
@@ -281,8 +307,16 @@ class StackFrames(gym.Wrapper):
     def _observation(self):
         return list(self.observations)
 
+    def clone_state(self):
+        return (tuple(self.observations), self.env.clone_state())
 
-class ResetAndFire(gym.Wrapper):
+    def restore_state(self, state):
+        assert len(state[0]) == len(self.observations)
+        self.observations.extend(state[0])
+        return self.env.restore_state(state[1])
+
+
+class ResetAndFire(Wrapper):
     def __init__(self, env):
         super(ResetAndFire, self).__init__(env)
         if env.unwrapped.get_action_meanings()[1] == 'FIRE': #0 is always noop, 1 is fire if the action is allowed

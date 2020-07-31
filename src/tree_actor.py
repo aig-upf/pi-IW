@@ -34,7 +34,7 @@ class TreeActor:
 
     def expand(self, node, action):
         if self.last_node is not node:
-            self.env.unwrapped.restore_state(node.data["s"])
+            self.env.restore_state(node.data["s"])
         
         #Perform step
         next_obs, r, end_of_episode, info = self.env.step(action)
@@ -50,7 +50,7 @@ class TreeActor:
         return child
 
     def observe(self, node):
-        node.data["s"] = self.env.unwrapped.clone_state()
+        node.data["s"] = self.env.clone_state()
 
         for nn, layer_names in self.observe_NNs.items():
             node_fill_network_data(session_manager.session, nn, layer_names, node.data)
