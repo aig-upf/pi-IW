@@ -91,7 +91,7 @@ def get_pi_iw_planning_step_fn(actor, planner, policy_fn, tree_budget, discount_
                      successor_fn=actor.generate_successor,
                      stop_condition_fn=budget_fn,
                      policy_fn=policy_fn)
-        return softmax_Q_tree_policy(actor.tree, actor.tree.branching_factor, discount_factor, temp=temp)
+        return softmax_Q_tree_policy(actor.tree, actor.tree.branching_factor, discount_factor, temp=0)
     return pi_iw_planning_step
 
 
